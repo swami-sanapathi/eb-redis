@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 import { RedisService } from './redis/redis.service';
 import { employees } from './constants/employees';
@@ -15,15 +15,21 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @Get('employee')
+  @Get('employees')
   async getEmployee() {
     return (await this.redis.getEmployee('employees')) ?? 'Employee not found';
   }
 
-  @Get('employee/set')
+  @Post('employee/set')
   async setEmployee(): Promise<string> {
     await this.redis.setEmployees(employees);
     return 'Employee data set';
+  }
+
+  @Get('employee/delete')
+  async deleteEmployee(): Promise<string> {
+    await this.redis.deleteEmployee();
+    return 'Employee data deleted';
   }
 
   @Get('evaluate')

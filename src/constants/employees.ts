@@ -15,13 +15,13 @@ export const employees = [
   {
     id: '3',
     name: 'Alice',
-    designation: 'Software Engineer',
+    designation: 'Tester',
     department: 'IT',
   },
   {
     id: '4',
     name: 'Bob',
-    designation: 'Software Engineer',
+    designation: 'IT Manager',
     department: 'IT',
   },
   {
@@ -33,31 +33,31 @@ export const employees = [
   {
     id: '6',
     name: 'David',
-    designation: 'Software Engineer',
+    designation: 'CEO',
     department: 'IT',
   },
   {
     id: '7',
     name: 'Eve',
-    designation: 'Software Engineer',
+    designation: 'Recruiter',
     department: 'IT',
   },
   {
     id: '8',
     name: 'Frank',
-    designation: 'Software Engineer',
+    designation: 'Jr.Software Engineer',
     department: 'IT',
   },
   {
     id: '9',
     name: 'Grace',
-    designation: 'Software Engineer',
+    designation: 'Sr.Software Engineer',
     department: 'IT',
   },
   {
     id: '10',
     name: 'Hank',
-    designation: 'Software Engineer',
+    designation: 'Project Manager',
     department: 'IT',
   },
 ];
