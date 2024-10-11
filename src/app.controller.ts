@@ -1,7 +1,8 @@
 import { Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 import { RedisService } from './redis/redis.service';
-import { employees } from './constants/employees';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Controller()
 export class AppController {
@@ -22,7 +23,10 @@ export class AppController {
 
   @Post('employee/set')
   async setEmployee(): Promise<string> {
-    await this.redis.setEmployees(employees);
+    const filePath = path.join(process.cwd(), 'src', 'constants', 'employees.json');
+    // const filePath = path.join(__dirname, 'constants', 'employees.json');
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    await this.redis.setEmployees(data);
     return 'Employee data set';
   }
 
