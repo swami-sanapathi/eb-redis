@@ -8,15 +8,15 @@ Injectable();
 export class RedisService {
   private readonly client: RedisClientType;
   constructor() {
-    this.client = createClient({
-      url: process.env.REDIS_URL,
-    });
+    // this.client = createClient({
+    //   url: process.env.REDIS_URL,
+    // });
 
-    this.client
-      .on('error', (err) => {
-        console.log('Redis error: ', err);
-      })
-      .connect();
+    // this.client
+    //   .on('error', (err) => {
+    //     console.log('Redis error: ', err);
+    //   })
+    //   .connect();
   }
 
   async getEmployee(id: string) {

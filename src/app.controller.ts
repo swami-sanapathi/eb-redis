@@ -3,12 +3,14 @@ import { AppService } from './app.service';
 import { RedisService } from './redis/redis.service';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ThreadService } from './thread/thread.service';
 
 @Controller()
 export class AppController {
   constructor(
     private readonly appService: AppService,
     private readonly redis: RedisService,
+    private readonly threadService: ThreadService,
   ) {}
 
   @Get()
@@ -40,5 +42,11 @@ export class AppController {
   async evaluateEligibilityBuilderRules(): Promise<string> {
     await this.redis.executeEligibilityBuilderRules();
     return 'Eligibility builder rules executed';
+  }
+
+  @Get('heavy-task')
+  async blockMainThread(): Promise<string> {
+    await this.threadService.blockMainThread();
+    return 'Main thread blocked';
   }
 }
