@@ -46,7 +46,8 @@ export class AppController {
 
   @Get('evaluate')
   async evaluateEligibilityBuilderRules(): Promise<string> {
-    await this.redis.executeEligibilityBuilderRules();
+    await this.redis.executeDynamicRules();
+    // await this.redis.executeEligibilityBuilderRules();
     return 'Eligibility builder rules executed';
   }
 
