@@ -42,7 +42,8 @@ local function processEmployees(batch)
   local employeeDataBatch = redis.call('HMGET', 'employees', unpack(batch))
 
   -- Process each employee in the batch
-  for k, empData in ipairs(employeeDataBatch) do
+  for k = 1, #employeeDataBatch do
+    local empData = employeeDataBatch[k]
     if empData then
       local emp = cjson.decode(empData)
       local satisfiedRules = {}
