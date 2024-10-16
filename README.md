@@ -212,3 +212,12 @@ script: `dabca0bc6e429c6c90a91c8287f89298d81ef71e`
 - To evaluate the rules on employee(s) we do use `evalSha` command. This command is used to execute a Lua script cached on the server. 
 - If employees list is less than 100, then we can send them as argument to `evalSha` command. If the list is more than 100, then we've to set those employees in a cache (expiry 2min) with a unique key and then we can pass the key as argument to `evalSha` command. In few cases we may need to pass the all employees list as argument to `evalSha` command, in that case send a flag (`allEmployees`) to the script.
 - Consumer of the process should be able to pass the rule ids as argument to the `evalSha` command, by using those rule ids fetch the corresponding rules from the redis cache and then evaluate the rules against each employee.
+
+
+## TODO
+- [x] IN, NOT IN operators support
+- [x] Pub-Sub support
+- [x] Effective cache update strategy
+- [x] Pipeline support for multiple commands especially for setting employees cache and fetching hash.
+- [x] Once strategy implemented then re-evaluate the rules for all the criteria
+
