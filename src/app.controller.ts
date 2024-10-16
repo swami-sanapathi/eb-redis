@@ -30,7 +30,7 @@ export class AppController {
       process.cwd(),
       'src',
       'constants',
-      'employees.json',
+      'employees_30000_with_50_fields.json',
     );
     // const filePath = path.join(__dirname, 'constants', 'employees.json');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -42,6 +42,11 @@ export class AppController {
   async deleteEmployee(): Promise<string> {
     await this.redis.deleteEmployee();
     return 'Employee data deleted';
+  }
+
+  @Post('load-script')
+  async loadScript(): Promise<string> {
+    return this.redis.loadScriptInRedis();
   }
 
   @Get('evaluate')

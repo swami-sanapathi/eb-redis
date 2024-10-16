@@ -32,220 +32,101 @@ export class RedisService {
     });
   }
 
+  async loadScriptInRedis() {
+    const luaScript = path.join(
+      process.cwd(),
+      'src',
+      'redis',
+      'readability.lua',
+    );
+
+    const sha1Hash = await this.redisClient.scriptLoad(
+      fs.readFileSync(luaScript, 'utf-8'),
+    );
+
+    // set the SHA1 hash in the cache
+    await this.redisClient.set('LUA_HASH', sha1Hash);
+    console.log({ sha1Hash });
+    await this.storeRulesAndEmployees();
+
+    return sha1Hash;
+  }
+
   async deleteEmployee(): Promise<void> {
     this.redisClient.del('employees');
   }
 
-  // execute eligibility builder rules on employee data using redis lua script, and then
-  // return the satisfied employee id with eligibility status
-  async executeEligibilityBuilderRules(): Promise<any> {
-    const luaScript = `
-local currentTimestamp = tonumber(ARGV[1])
-local sixMonthsAgo = currentTimestamp - (6 * 30 * 24 * 60 * 60)
+  async executeDynamicRules(employees?: string[]): Promise<any> {
+    const luaHash = await this.redisClient.get('LUA_HASH'); // Retrieve the cached Lua script SHA1 hash
 
-local employees = redis.call('HGETALL', 'employees')
-local eligibleEmployees = {}
+    const evaluateAllRules = 'true'; // Default behavior: stop after the first satisfied rule
 
-for i = 1, #employees, 2 do
-  local emp = cjson.decode(employees[i+1])
-  local satisfiedRules = {}
-
-  -- Rule 1: Experience and Performance Rating
-  if emp.experience and emp.performance_rating and emp.experience > 10 and emp.experience < 20 and emp.performance_rating > 4.0 then
-    table.insert(satisfiedRules, 1)
-  end
-
-  -- Rule 2: Designation and Department
-  if emp.designation == 'Chief Architect' and emp.department == 'HR' then
-    table.insert(satisfiedRules, 2)
-  end
-
-  -- Rule 3: Salary and Bonus
-  if emp.salary and emp.bonus and emp.salary > 70000 and emp.bonus > 5000 then
-    table.insert(satisfiedRules, 3)
-  end
-
-  -- Rule 4: Project Completion Rate and Performance Goal Completion
-  if emp.project_completion_rate and emp.performance_goal_completion and emp.project_completion_rate > 95 and emp.performance_goal_completion > 80 then
-    table.insert(satisfiedRules, 4)
-  end
-
-  -- Rule 5: Years Since Last Promotion and Training Completed
-  if emp.years_since_last_promotion and emp.training_completed and emp.years_since_last_promotion < 3 and emp.training_completed == true then
-    table.insert(satisfiedRules, 5)
-  end
-
-  -- Rule 6: Preferred Work Location and Remote Work
-  if emp.preferred_work_location == 'Chicago' and emp.remote_work == false then
-    table.insert(satisfiedRules, 6)
-  end
-
-  -- Rule 7: Education and Certifications
-  if emp.education == "Bachelor's" and emp.certifications then
-    for _, cert in ipairs(emp.certifications) do
-      if cert == 'PMP' or cert == 'Scrum Master' then
-        table.insert(satisfiedRules, 7)
-        break
-      end
-    end
-  end
-
-  -- Rule 9: Skills and Languages Spoken
-  if emp.skills and emp.languages_spoken then
-    local hasSQL, speaksEnglish = false, false
-    for _, skill in ipairs(emp.skills) do
-      if skill == 'SQL' then
-        hasSQL = true
-        break
-      end
-    end
-    for _, language in ipairs(emp.languages_spoken) do
-      if language == 'English' then
-        speaksEnglish = true
-        break
-      end
-    end
-    if hasSQL and speaksEnglish then
-      table.insert(satisfiedRules, 9)
-    end
-  end
-
-  -- Rule 10: Marital Status and Gender
-  if emp.marital_status == 'Single' and emp.gender == 'Female' then
-    table.insert(satisfiedRules, 10)
-  end
-
-  -- Rule 11: Performance Rating and Salary
-  if emp.performance_rating and emp.salary and emp.performance_rating >= 4.5 and emp.salary < 80000 then
-    table.insert(satisfiedRules, 11)
-  end
-
-  -- Rule 12: Designation and Experience
-  if emp.designation == 'Software Engineer' and emp.experience and emp.experience >= 5 and emp.experience <= 15 then
-    table.insert(satisfiedRules, 12)
-  end
-
-  -- If any rules are satisfied, add the employee to the result
-  if #satisfiedRules > 0 then
-    table.insert(eligibleEmployees, {id = employees[i], rules_satisfied = satisfiedRules})
-  end
-end
-
-return cjson.encode(eligibleEmployees)
-
-`;
-
-    const currentTimestamp = Math.floor(Date.now() / 1000);
-    const response = await this.redisClient.eval(luaScript, {
-      keys: [],
-      arguments: [currentTimestamp.toString()],
-    });
-
-    // Write the response to a file
-    fs.writeFileSync(
-      path.join(process.cwd(), 'src', 'constants', 'eligible-employees.json'),
-      JSON.stringify(response),
-    );
-
-    return response;
-  }
-  async executeDynamicRules(): Promise<any> {
-    const luaScript = `
-    local currentTimestamp = tonumber(ARGV[1])
-    local batchSize = tonumber(ARGV[2])
-    local eligibleEmployees = {}
-  
-    -- Pre-compile rules once
-    local ruleCount = tonumber(ARGV[3])
-    local compiledRules = {}
-  
-    for ruleIndex = 1, ruleCount do
-      local rule = ARGV[3 + ruleIndex]
-      local ruleFunc, err = loadstring("return " .. rule)
-      if ruleFunc then
-        table.insert(compiledRules, ruleFunc) -- Store precompiled rule
-      else
-        redis.log(redis.LOG_NOTICE, "Error loading rule: " .. err)
-      end
-    end
-  
-    -- Fetch employees in batches
-    local cursor = "0"
-    repeat
-      -- Fetch a batch of employees using HSCAN to avoid fetching everything at once
-      local result = redis.call('HSCAN', 'employees', cursor, 'COUNT', batchSize)
-      cursor = result[1]
-      local employees = result[2]
-  
-      -- Process each employee in the batch
-      for i = 1, #employees, 2 do
-        local emp = cjson.decode(employees[i+1])
-        local satisfiedRules = {}
-  
-        -- Evaluate precompiled rules for the employee
-        for ruleIndex, ruleFunc in ipairs(compiledRules) do
-          -- Set the employee environment
-          local env = { emp = emp }
-          setfenv(ruleFunc, env)
-  
-          -- Safely execute the precompiled rule
-          local success, result = pcall(ruleFunc)
-          if success and result then
-            table.insert(satisfiedRules, ruleIndex) -- Rule is satisfied
-          end
-        end
-  
-        -- If any rules are satisfied, add the employee to the result
-        if #satisfiedRules > 0 then
-          table.insert(eligibleEmployees, {id = employees[i], rules_satisfied = satisfiedRules})
-        end
-      end
-    until cursor == "0"  -- Continue until the end of the hash
-  
-    -- Return eligible employees with satisfied rule indices
-    return cjson.encode(eligibleEmployees)
-    `;
-
-    const currentTimestamp = Math.floor(Date.now() / 1000);
-
-    // Define dynamic rules as an array of strings
-    const rules = [
-      '(emp.experience > 10) and (emp.experience < 20) and (emp.performance_rating > 4.0)',
-      "(emp.designation == 'Chief Architect') and (emp.department == 'HR')",
-      '(emp.salary > 70000) and (emp.bonus > 5000)',
-      '(emp.project_completion_rate > 95) and (emp.performance_goal_completion > 80)',
-      '(emp.years_since_last_promotion < 3) and (emp.training_completed == true)',
-      "(emp.preferred_work_location == 'Chicago') and (emp.remote_work == false)",
-      '(emp.education == "Bachelor\'s")',
-      "(emp.skills ~= nil and emp.languages_spoken ~= nil and emp.skills[1] == 'SQL' and emp.languages_spoken[1] == 'English')",
-      "(emp.marital_status == 'Single') and (emp.gender == 'Female')",
-      '(emp.performance_rating >= 4.5) and (emp.salary < 80000)',
-      "(emp.designation == 'Software Engineer') and (emp.experience >= 5) and (emp.experience <= 15)",
-      "(emp.experience > 5) and (emp.experience < 10) and (emp.salary > 50000)",
-      "(emp.department == 'Engineering') and (emp.performance_rating > 4.0) or (emp.department == 'HR') and (emp.performance_rating > 4.5)",
-      "emp.gender = 'female' or emp.marital_status = 'single'",
-    ];
-
-    // Pass the current timestamp, batch size, and rules to the Lua script
-    const batchSize = 100; // Process 100 employees at a time
     const luaArguments = [
-      currentTimestamp.toString(),
-      batchSize.toString(),
-      rules.length.toString(),
-      ...rules,
+      JSON.stringify([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]), // Rules JSON string
+      evaluateAllRules, // optional
     ];
 
-    const response = await this.redisClient.eval(luaScript, {
+    const response = await this.redisClient.evalSha(luaHash, {
       keys: [],
       arguments: luaArguments,
     });
 
     // Write the response to a file
-    fs.writeFileSync(
-      path.join(process.cwd(), 'src', 'constants', 'eligible-employees.json'),
-      JSON.stringify(response),
-    );
+    // fs.writeFileSync(
+    //   path.join(process.cwd(), 'src', 'constants', 'eligible-employees.json'),
+    //   JSON.stringify(response),
+    // );
 
     return response;
+  }
+
+  async storeRulesAndEmployees(): Promise<any> {
+    // Storing rules in Redis
+    const rules = {
+      1: '(emp.experience > 10) and (emp.experience < 20) and (emp.performance_rating > 4.0)',
+      2: "(emp.designation == 'Chief Architect') and (emp.department == 'HR')",
+      3: '(emp.salary > 70000) and (emp.bonus > 5000)',
+      4: '(emp.project_completion_rate > 95) and (emp.performance_goal_completion > 80)',
+      5: '(emp.years_since_last_promotion < 3) and (emp.training_completed == true)',
+      6: "(emp.preferred_work_location == 'Chicago') and (emp.remote_work == false)",
+      7: '(emp.education == "Bachelor\'s")',
+      8: "(emp.skills ~= nil and emp.languages_spoken ~= nil and emp.skills[1] == 'SQL' and emp.languages_spoken[1] == 'English')",
+      9: "(emp.marital_status == 'Single') and (emp.gender == 'Female')",
+      10: '(emp.performance_rating >= 4.5) and (emp.salary < 80000)',
+      11: "(emp.designation == 'Software Engineer') and (emp.experience >= 5) and (emp.experience <= 15)",
+      12: '(emp.experience > 5) and (emp.experience < 10) and (emp.salary > 50000)',
+      13: "(emp.department == 'Engineering') and (emp.performance_rating > 4.0) or (emp.department == 'HR') and (emp.performance_rating > 4.5)",
+      14: "emp.gender == 'Female' or emp.marital_status == 'Single'",
+    };
+
+    // Prepare the arguments for MSET in the format ['key1', 'value1', 'key2', 'value2', ...]
+    const msetArgs = [];
+    Object.keys(rules).forEach((ruleId) => {
+      msetArgs.push(`rules:${ruleId}`, rules[ruleId]);
+    });
+
+    // Use MSET to store all rules in one Redis command
+    this.redisClient
+      .MSET(msetArgs)
+      .then(() => {
+        console.log('All rules stored successfully in one step');
+      })
+      .catch((err) => {
+        console.error('Error storing rules:', err);
+      });
+
+    // Employee IDs to store in PROCESS_EMPLOYEES
+    const employeeIds = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+
+    // Store employee IDs as a list in PROCESS_EMPLOYEES
+    this.redisClient
+      .set('PROCESS_EMPLOYEES', JSON.stringify(employeeIds))
+      .then(() => {
+        console.log('PROCESS_EMPLOYEES stored successfully');
+      })
+      .catch((err) => {
+        console.error('Error setting PROCESS_EMPLOYEES:', err);
+      });
+    return 'Rules and employees stored successfully';
   }
 }

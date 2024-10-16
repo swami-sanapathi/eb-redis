@@ -191,3 +191,24 @@ usually the rules are looks like this
 
 
 what are the best way to build rule engine in performant and scalable way for NodeJS app, Each Rule Group had Multiple rules, number is not final, this group should be evaluated against the all the employees, here the employees number also not estimated
+
+
+// ask: As mentioned above, dynamically-generated scripts are an anti-pattern. Generating scripts during the application's runtime may, and probably will, exhaust the host's memory resources for caching them. Instead, scripts should be as generic as possible and provide customized execution via their arguments.
+// is this script is dynamically generated?
+// redis provides a way to load scripts into the cache using the SCRIPT LOAD command. This command returns a SHA-1 hash that can be used to execute the script later
+// test the results with cached script
+// If employee is falling under the rule, then we can cache the result for the employee, so that we can avoid the rest of the rules for the employee, this functionality should work based on argument, the argument type is whether evaluation of all the rules for an employee or evaluation of a single rule for all the employees
+
+dept_id IN (1,2,3)
+dept_id NOT IN (1,2,3)
+
+
+script: `dabca0bc6e429c6c90a91c8287f89298d81ef71e`
+
+
+
+## Notes:
+- `scriptLoad` Loads a Lua script into the Redis server's script cache and returns the SHA1 hash of the script, this hash is cached with the following key `LUA_HASH` to use it later to execute the script.
+- To evaluate the rules on employee(s) we do use `evalSha` command. This command is used to execute a Lua script cached on the server. 
+- If employees list is less than 100, then we can send them as argument to `evalSha` command. If the list is more than 100, then we've to set those employees in a cache (expiry 2min) with a unique key and then we can pass the key as argument to `evalSha` command. In few cases we may need to pass the all employees list as argument to `evalSha` command, in that case send a flag (`allEmployees`) to the script.
+- Consumer of the process should be able to pass the rule ids as argument to the `evalSha` command, by using those rule ids fetch the corresponding rules from the redis cache and then evaluate the rules against each employee.
