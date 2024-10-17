@@ -1,4 +1,4 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get, Param, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 import { RedisService } from './redis/redis.service';
 import * as fs from 'node:fs';
@@ -19,9 +19,9 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @Get('employees')
-  async getEmployee() {
-    return (await this.redis.getEmployee('employees')) ?? 'Employee not found';
+  @Get('employees/:id')
+  async getEmployee(@Param() params: any) {
+    return (await this.redis.getEmployee(params.id)) ?? 'Employee not found';
   }
 
   @Post('employee/set')
