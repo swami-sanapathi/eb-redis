@@ -9,7 +9,15 @@ Injectable();
 export class RedisService {
   private readonly redisClient: RedisClientType;
   constructor() {
-    this.redisClient = createClient({ url: process.env.REDIS_URL });
+    // this.redisClient = createClient({ url: process.env.REDIS_URL });
+    this.redisClient = createClient({
+      socket: {
+        host: process.env.REDIS_HOST,
+        port: +process.env.REDIS_PORT,
+      },
+      username: process.env.REDIS_USERNAME,
+      password: process.env.REDIS_PASSWORD,
+    });
   }
 
   async onModuleInit() {
@@ -21,7 +29,7 @@ export class RedisService {
   }
 
   async getEmployee(id: string) {
-    const empData = await this.redisClient.HGET('employees', '1');
+    const empData = await this.redisClient.HGET('employees', id);
     return empData;
   }
 
@@ -59,23 +67,37 @@ export class RedisService {
   async executeDynamicRules(employees?: string[]): Promise<any> {
     const luaHash = await this.redisClient.get('LUA_HASH'); // Retrieve the cached Lua script SHA1 hash
 
+    // Employee IDs to store in PROCESS_EMPLOYEES
+    const employeeIds = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+
+    // Store employee IDs as a list in PROCESS_EMPLOYEES
+    this.redisClient
+      .setEx('PROCESS_EMPLOYEES', 120, JSON.stringify(employeeIds))
+      .then(() => {
+        console.log('PROCESS_EMPLOYEES stored successfully');
+      })
+      .catch((err) => {
+        console.error('Error setting PROCESS_EMPLOYEES:', err);
+      });
+
     const evaluateAllRules = 'true'; // Default behavior: stop after the first satisfied rule
 
     const luaArguments = [
-      JSON.stringify([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]), // Rules JSON string
+      JSON.stringify([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]), // Rules JSON string
       evaluateAllRules, // optional
     ];
 
     const response = await this.redisClient.evalSha(luaHash, {
       keys: [],
+      // keys: ['PROCESS_EMPLOYEES'],
       arguments: luaArguments,
     });
-
+    
     // Write the response to a file
-    // fs.writeFileSync(
-    //   path.join(process.cwd(), 'src', 'constants', 'eligible-employees.json'),
-    //   JSON.stringify(response),
-    // );
+    fs.writeFileSync(
+      path.join(process.cwd(), 'src', 'constants', 'eligible-employees.json'),
+      JSON.stringify(response),
+    );
 
     return response;
   }
@@ -95,8 +117,10 @@ export class RedisService {
       10: '(emp.performance_rating >= 4.5) and (emp.salary < 80000)',
       11: "(emp.designation == 'Software Engineer') and (emp.experience >= 5) and (emp.experience <= 15)",
       12: '(emp.experience > 5) and (emp.experience < 10) and (emp.salary > 50000)',
-      13: "(emp.department == 'Engineering') and (emp.performance_rating > 4.0) or (emp.department == 'HR') and (emp.performance_rating > 4.5)",
+      13: "(emp.department == 'IT') and (emp.performance_rating > 4.0) or (emp.department == 'HR') and (emp.performance_rating > 4.5)",
       14: "emp.gender == 'Female' or emp.marital_status == 'Single'",
+      15: "(emp.designation == 'Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager') and not_in_list(emp.skills, {'Python'})",
+      16: "in_list(emp.skills, {'SQL'}) and not_in_list(emp.designation, {'SQL'})",
     };
 
     // Prepare the arguments for MSET in the format ['key1', 'value1', 'key2', 'value2', ...]
@@ -115,18 +139,6 @@ export class RedisService {
         console.error('Error storing rules:', err);
       });
 
-    // Employee IDs to store in PROCESS_EMPLOYEES
-    const employeeIds = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
-
-    // Store employee IDs as a list in PROCESS_EMPLOYEES
-    this.redisClient
-      .set('PROCESS_EMPLOYEES', JSON.stringify(employeeIds))
-      .then(() => {
-        console.log('PROCESS_EMPLOYEES stored successfully');
-      })
-      .catch((err) => {
-        console.error('Error setting PROCESS_EMPLOYEES:', err);
-      });
     return 'Rules and employees stored successfully';
   }
 }
