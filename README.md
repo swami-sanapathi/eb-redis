@@ -220,4 +220,69 @@ script: `dabca0bc6e429c6c90a91c8287f89298d81ef71e`
 - [x] Effective cache update strategy
 - [x] Pipeline support for multiple commands especially for setting employees cache and fetching hash.
 - [x] Once strategy implemented then re-evaluate the rules for all the criteria
+- generate unique `uuid` for employees cache key
 
+## Pub-Sub Implementation
+1. Upon updating of any employee attribute, then we need update the cache accordingly.
+  Considerations for implementing this feature
+    a. Suppose if single employee attribute has changed, is once case 
+    b. the other one is, upon updating the huge employees information in bulk and then how to handle this?
+2. Once cache update strategy is implemented then we need figure out the way to identify the rules which had the newly updated attribute, once the rules are identified then re-evaluate the rules to the respective
+employees.
+
+
+
+###### Master Rules
+Rule ID           |         Rule                                    |     Owner
+1                 |     designation = 'Sr. Dev'                     |     Leave Management
+2                 |     department = 'IT'                           |     Leave Management
+3                 |     designation = 'Manager' AND experience > 5  |     Leave Management 
+4                 |     default rule                                |     Leave Management
+5                 |     status = 'Active'                           |     Payroll Management
+6                 |     department = 'HR'                           |     Payroll Management
+7                 |     designation = 'Manager' AND experience < 5  |     Payroll Management
+8                 |     default rule                                |     Payroll Management
+
+
+
+Now leave management team *starts configuring the values for each rule*, later on they'll use these configurations to the satisfied employee with respective rule.
+
+*Employees Data*
+EmployeeID | designation | department | experience
+1. A001   |   Jr.Dev    |    IT      |      2
+2. A002   |   Sr.Tester |    Testing |      6  
+3. A003   |   Manager   |    HR      |      4
+4. A004   |   Sr.Dev    |    IT      |      5
+5. A005   |   Recruiter |    HR      |      1
+
+
+
+*Employees with satisfied rule*
+1. A001 - 2
+2. A002 - 3
+3. A003 - 3
+4. A004 - 1
+5. A005 - 3
+
+
+Once we've the employee with satisfied rule then pick the respective configuration to that rule and then
+*apply the configuration* to that employee.
+
+
+Now, `designation` is updated to the employee A001
+
+EmployeeID | designation | department 
+1. A001   |   Sr.Dev    |    IT
+
+Cache Contains:
+Master Rules:
+1. `rules:rule_id`
+2. `employees`
+3. `LEAVE_MANAGEMENT_LEAVE_GROUP_RULES`: values [1,2,3,4]
+4. `PAYROLL_MANAGEMENT_RULES` : values: [5,6,7,8]
+
+
+Now we need to *identify* the rules which contains `designation` attribute in master rules. to identify them we've to maintain cache for each attribute with the corresponding rule ids. once we identify the rules(i.e., 1,3,7) which are affected by the attribute those rules should be compared with leave management rules (cached in `LEAVE_MANAGEMENT_LEAVE_GROUP_RULES` i.e., 1,2,3,4). if we find any match it is there then employee A001 will be needs to re-evaluate the against the leave management rules which are only by sending an event the initial process what we implement with lua script is repeated with this as well.
+
+
+1. If single attribute is updated multiple employees, search the _attribute rule_ map then send those rules to each criteria owners, then they need to filter out the configured rules with the sent rules which will be the subset of these rules. Finally after filtering out these rules we can continue with the initial process. 
