@@ -57,3 +57,5 @@ export interface Employee {
   last_system_login: string; // Date and time of last system login (ISO string)
   is_on_call: boolean;
 }
+
+export const EMPLOYEE_UPDATE = 'EMPLOYEE_UPDATE';

@@ -18,8 +18,13 @@ export class RedisService {
     });
   }
 
+  getConnection() {
+    return this.redisClient;
+  }
+
   async getEmployee(id: string) {
     const empData = await this.redisClient.hget('employees', id);
+    // const empData = await this.redisClient.hgetall('employees');
     return empData;
   }
 
@@ -30,10 +35,8 @@ export class RedisService {
     });
   }
 
-  async updateEmployees(data: Employee[]): Promise<void> {
-    data.forEach((emp) => {
-      this.redisClient.hset('employees', emp.emp_id, JSON.stringify(emp));
-    });
+  async updateEmployees(emp: Employee): Promise<void> {
+    this.redisClient.hset('employees', emp.emp_id, JSON.stringify(emp));
   }
 
   async loadScriptInRedis() {
@@ -48,9 +51,6 @@ export class RedisService {
       'LOAD',
       fs.readFileSync(luaScript, 'utf-8'),
     );
-
-    console.log(sha1Hash);
-    console.log(typeof sha1Hash);
 
     // set the SHA1 hash in the cache
     await this.redisClient.set('LUA_HASH', sha1Hash as string);
