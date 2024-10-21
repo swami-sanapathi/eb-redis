@@ -216,11 +216,10 @@ script: `dabca0bc6e429c6c90a91c8287f89298d81ef71e`
 
 ## TODO
 - [x] IN, NOT IN operators support
-- [x] Pub-Sub support
-- [x] Effective cache update strategy
+- [x] generate unique `uuid` for employees cache key
+- [x] Pub-Sub support to invalidate the rules and employee information
 - [x] Pipeline support for multiple commands especially for setting employees cache and fetching hash.
 - [x] Once strategy implemented then re-evaluate the rules for all the criteria
-- generate unique `uuid` for employees cache key
 
 ## Pub-Sub Implementation
 1. Upon updating of any employee attribute, then we need update the cache accordingly.

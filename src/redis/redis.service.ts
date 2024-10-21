@@ -65,20 +65,12 @@ export class RedisService {
   }
 
   async executeDynamicRules(employees?: string[]): Promise<any> {
-    const luaHash = await this.redisClient.get('LUA_HASH'); // Retrieve the cached Lua script SHA1 hash
-
-    // Employee IDs to store in PROCESS_EMPLOYEES
     const employeeIds = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
-
-    // Store employee IDs as a list in PROCESS_EMPLOYEES
-    this.redisClient
-      .setex('PROCESS_EMPLOYEES', 120, JSON.stringify(employeeIds))
-      .then(() => {
-        console.log('PROCESS_EMPLOYEES stored successfully');
-      })
-      .catch((err) => {
-        console.error('Error setting PROCESS_EMPLOYEES:', err);
-      });
+    // Create a pipeline to execute multiple commands in a single round trip to Redis
+    const pipeline = this.redisClient.pipeline();
+    pipeline.get('LUA_HASH'); // Retrieve the cached Lua script SHA1 hash
+    pipeline.setex('PROCESS_EMPLOYEES', 120, JSON.stringify(employeeIds));
+    const [[, results]] = await pipeline.exec();
 
     const evaluateAllRules = 'true'; // Default behavior: stop after the first satisfied rule
 
@@ -87,10 +79,10 @@ export class RedisService {
       evaluateAllRules, // optional
     ];
 
-    const redisKeys = ['PROCESS_EMPLOYEES'];
+    const redisKeys = [];
 
     const response = await this.redisClient.evalsha(
-      luaHash,
+      results as string,
       redisKeys.length,
       ...redisKeys,
       ...luaArguments,
