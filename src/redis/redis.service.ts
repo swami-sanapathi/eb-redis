@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { createClient, RedisClientType } from 'redis';
+import Redis from 'ioredis';
 import { Employee } from 'src/interfaces/employee';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -7,36 +7,32 @@ import * as path from 'path';
 Injectable();
 
 export class RedisService {
-  private readonly redisClient: RedisClientType;
+  private readonly redisClient: Redis;
   constructor() {
     // this.redisClient = createClient({ url: process.env.REDIS_URL });
-    this.redisClient = createClient({
-      socket: {
-        host: process.env.REDIS_HOST,
-        port: +process.env.REDIS_PORT,
-      },
+    this.redisClient = new Redis({
+      host: process.env.REDIS_HOST,
+      port: +process.env.REDIS_PORT,
       username: process.env.REDIS_USERNAME,
       password: process.env.REDIS_PASSWORD,
     });
   }
 
-  async onModuleInit() {
-    await this.redisClient.connect();
-  }
-
-  async onModuleDestroy() {
-    await this.redisClient.disconnect();
-  }
-
   async getEmployee(id: string) {
-    const empData = await this.redisClient.HGET('employees', id);
+    const empData = await this.redisClient.hget('employees', id);
     return empData;
   }
 
   // set employees using hash data structure
   async setEmployees(data: Employee[]): Promise<void> {
     data.forEach((emp) => {
-      this.redisClient.hSet('employees', emp.emp_id, JSON.stringify(emp));
+      this.redisClient.hset('employees', emp.emp_id, JSON.stringify(emp));
+    });
+  }
+
+  async updateEmployees(data: Employee[]): Promise<void> {
+    data.forEach((emp) => {
+      this.redisClient.hset('employees', emp.emp_id, JSON.stringify(emp));
     });
   }
 
@@ -48,16 +44,20 @@ export class RedisService {
       'readability.lua',
     );
 
-    const sha1Hash = await this.redisClient.scriptLoad(
+    const sha1Hash = await this.redisClient.script(
+      'LOAD',
       fs.readFileSync(luaScript, 'utf-8'),
     );
 
+    console.log(sha1Hash);
+    console.log(typeof sha1Hash);
+
     // set the SHA1 hash in the cache
-    await this.redisClient.set('LUA_HASH', sha1Hash);
+    await this.redisClient.set('LUA_HASH', sha1Hash as string);
     console.log({ sha1Hash });
     await this.storeRulesAndEmployees();
 
-    return sha1Hash;
+    return sha1Hash as string;
   }
 
   async deleteEmployee(): Promise<void> {
@@ -72,7 +72,7 @@ export class RedisService {
 
     // Store employee IDs as a list in PROCESS_EMPLOYEES
     this.redisClient
-      .setEx('PROCESS_EMPLOYEES', 120, JSON.stringify(employeeIds))
+      .setex('PROCESS_EMPLOYEES', 120, JSON.stringify(employeeIds))
       .then(() => {
         console.log('PROCESS_EMPLOYEES stored successfully');
       })
@@ -87,12 +87,15 @@ export class RedisService {
       evaluateAllRules, // optional
     ];
 
-    const response = await this.redisClient.evalSha(luaHash, {
-      keys: [],
-      // keys: ['PROCESS_EMPLOYEES'],
-      arguments: luaArguments,
-    });
-    
+    const redisKeys = ['PROCESS_EMPLOYEES'];
+
+    const response = await this.redisClient.evalsha(
+      luaHash,
+      redisKeys.length,
+      ...redisKeys,
+      ...luaArguments,
+    );
+
     // Write the response to a file
     fs.writeFileSync(
       path.join(process.cwd(), 'src', 'constants', 'eligible-employees.json'),
@@ -131,7 +134,7 @@ export class RedisService {
 
     // Use MSET to store all rules in one Redis command
     this.redisClient
-      .MSET(msetArgs)
+      .mset(msetArgs)
       .then(() => {
         console.log('All rules stored successfully in one step');
       })
