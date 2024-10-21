@@ -216,6 +216,8 @@ script: `dabca0bc6e429c6c90a91c8287f89298d81ef71e`
 
 ## TODO
 - [x] IN, NOT IN operators support
+- [x] Write an api or function (if it fn then it should be IIF  ) to flush and load the latest lua script to the cache
+- [x] Create a cron job to load tha latest employees and rules information to the cache for every 24hrs
 - [x] generate unique `uuid` for employees cache key
 - [x] Pub-Sub support to invalidate the rules and employee information
 - [x] Pipeline support for multiple commands especially for setting employees cache and fetching hash.
