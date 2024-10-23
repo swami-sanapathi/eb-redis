@@ -44,7 +44,7 @@ export class RedisService {
       process.cwd(),
       'src',
       'redis',
-      'readability.lua',
+      'evaluate-rules.lua',
     );
 
     const sha1Hash = await this.redisClient.script(
@@ -75,11 +75,11 @@ export class RedisService {
     const evaluateAllRules = 'true'; // Default behavior: stop after the first satisfied rule
 
     const luaArguments = [
-      JSON.stringify([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]), // Rules JSON string
+      '1', // Rule Group as JSON string
       evaluateAllRules, // optional
     ];
 
-    const redisKeys = [];
+    const redisKeys = ['PROCESS_EMPLOYEES'];
 
     const response = await this.redisClient.evalsha(
       results as string,
@@ -99,41 +99,57 @@ export class RedisService {
 
   async storeRulesAndEmployees(): Promise<any> {
     // Storing rules in Redis
-    const rules = {
-      1: '(emp.experience > 10) and (emp.experience < 20) and (emp.performance_rating > 4.0)',
-      2: "(emp.designation == 'Chief Architect') and (emp.department == 'HR')",
-      3: '(emp.salary > 70000) and (emp.bonus > 5000)',
-      4: '(emp.project_completion_rate > 95) and (emp.performance_goal_completion > 80)',
-      5: '(emp.years_since_last_promotion < 3) and (emp.training_completed == true)',
-      6: "(emp.preferred_work_location == 'Chicago') and (emp.remote_work == false)",
-      7: '(emp.education == "Bachelor\'s")',
-      8: "(emp.skills ~= nil and emp.languages_spoken ~= nil and emp.skills[1] == 'SQL' and emp.languages_spoken[1] == 'English')",
-      9: "(emp.marital_status == 'Single') and (emp.gender == 'Female')",
-      10: '(emp.performance_rating >= 4.5) and (emp.salary < 80000)',
-      11: "(emp.designation == 'Software Engineer') and (emp.experience >= 5) and (emp.experience <= 15)",
-      12: '(emp.experience > 5) and (emp.experience < 10) and (emp.salary > 50000)',
-      13: "(emp.department == 'IT') and (emp.performance_rating > 4.0) or (emp.department == 'HR') and (emp.performance_rating > 4.5)",
-      14: "emp.gender == 'Female' or emp.marital_status == 'Single'",
-      15: "(emp.designation == 'Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager') and not_in_list(emp.skills, {'Python'})",
-      16: "in_list(emp.skills, {'SQL'}) and not_in_list(emp.designation, {'SQL'})",
+    const ruleGroups = {
+      1: {
+        1: '(emp.experience > 10) and (emp.experience < 20) and (emp.performance_rating > 4.0)',
+        2: "(emp.designation == 'Chief Architect') and (emp.department == 'HR')",
+        3: '(emp.salary > 70000) and (emp.bonus > 5000)',
+        4: '(emp.project_completion_rate > 95) and (emp.performance_goal_completion > 80)',
+        5: '(emp.years_since_last_promotion < 3) and (emp.training_completed == true)',
+        6: "(emp.preferred_work_location == 'Chicago') and (emp.remote_work == false)",
+        7: '(emp.education == "Bachelor\'s")',
+        8: "(emp.skills ~= nil and emp.languages_spoken ~= nil and emp.skills[1] == 'SQL' and emp.languages_spoken[1] == 'English')",
+        9: "(emp.marital_status == 'Single') and (emp.gender == 'Female')",
+        10: '(emp.performance_rating >= 4.5) and (emp.salary < 80000)',
+        11: "(emp.designation == 'Software Engineer') and (emp.experience >= 5) and (emp.experience <= 15)",
+        12: '(emp.experience > 5) and (emp.experience < 10) and (emp.salary > 50000)',
+        13: "(emp.department == 'IT') and (emp.performance_rating > 4.0) or (emp.department == 'HR') and (emp.performance_rating > 4.5)",
+        14: "emp.gender == 'Female' or emp.marital_status == 'Single'",
+        15: "(emp.designation == 'Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager') and not_in_list(emp.skills, {'Python'})",
+        16: "in_list(emp.skills, {'SQL'}) and not_in_list(emp.designation, {'SQL'})",
+      },
+      2: {
+        1: '(emp.experience > 10) and (emp.experience < 20) and (emp.performance_rating > 4.0)',
+        2: "(emp.designation == 'Chief Architect') and (emp.department == 'HR')",
+        3: '(emp.salary > 70000) and (emp.bonus > 5000)',
+        4: '(emp.project_completion_rate > 95) and (emp.performance_goal_completion > 80)',
+        5: '(emp.years_since_last_promotion < 3) and (emp.training_completed == true)',
+        6: "(emp.preferred_work_location == 'Chicago') and (emp.remote_work == false)",
+        7: '(emp.education == "Bachelor\'s")',
+        8: "(emp.skills ~= nil and emp.languages_spoken ~= nil and emp.skills[1] == 'SQL' and emp.languages_spoken[1] == 'English')",
+        9: "(emp.marital_status == 'Single') and (emp.gender == 'Female')",
+        10: '(emp.performance_rating >= 4.5) and (emp.salary < 80000)',
+        11: "(emp.designation == 'Software Engineer') and (emp.experience >= 5) and (emp.experience <= 15)",
+        12: '(emp.experience > 5) and (emp.experience < 10) and (emp.salary > 50000)',
+        13: "(emp.department == 'IT') and (emp.performance_rating > 4.0) or (emp.department == 'HR') and (emp.performance_rating > 4.5)",
+        14: "emp.gender == 'Female' or emp.marital_status == 'Single'",
+        15: "(emp.designation == 'Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager' or emp.designation == 'Business Analyst' or emp.designation == 'Product Manager') and not_in_list(emp.skills, {'Python'})",
+        16: "in_list(emp.skills, {'SQL'}) and not_in_list(emp.designation, {'SQL'})",
+      },
     };
 
-    // Prepare the arguments for MSET in the format ['key1', 'value1', 'key2', 'value2', ...]
-    const msetArgs = [];
-    Object.keys(rules).forEach((ruleId) => {
-      msetArgs.push(`rules:${ruleId}`, rules[ruleId]);
-    });
+    // Convert the rule groups to a JSON string since Redis doesn't support nested objects directly
+    const serializedRuleGroups = JSON.stringify(ruleGroups);
 
-    // Use MSET to store all rules in one Redis command
-    this.redisClient
-      .mset(msetArgs)
-      .then(() => {
-        console.log('All rules stored successfully in one step');
-      })
-      .catch((err) => {
-        console.error('Error storing rules:', err);
-      });
-
-    return 'Rules and employees stored successfully';
+    // Store in Redis as a string
+    // Iterate over each ruleGroupId and store each group in Redis hash
+    for (const ruleGroupId in ruleGroups) {
+      const ruleGroup = ruleGroups[ruleGroupId];
+      await this.redisClient.hset(
+        'rules',
+        ruleGroupId,
+        JSON.stringify(ruleGroup),
+      );
+    }
   }
 }
